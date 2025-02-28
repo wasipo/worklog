@@ -1,14 +1,14 @@
 import './styles.css';
-import { formatDate, formatTime } from '../../utils/dateUtils';
+import { formatDate, formatTime, getWeekday } from '../../utils/dateUtils';
 
 export function AttendanceTable({ logs, onBreakTimeChange }) {
   if (!Array.isArray(logs) || logs.length === 0) {
     return null;
   }
 
-  // 合計時間の計算
+  // 合計時間の計算（"---" の場合はスキップ）
   const totalMinutes = logs.reduce((acc, log) => {
-    if (!log.workingHours) return acc;
+    if (!log.workingHours || log.workingHours === '---') return acc;
     const [hours, minutes] = log.workingHours.split(':').map(n => parseInt(n, 10));
     return acc + (hours * 60 + minutes);
   }, 0);
@@ -17,6 +17,19 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}:${mins.toString().padStart(2, '0')}`;
+  };
+
+  // 日付と曜日の表示用フォーマット関数
+  const formatDateWithWeekday = (dateStr) => {
+    if (!dateStr || dateStr === '---') return '---';
+    const weekday = getWeekday(dateStr);
+    const weekdayClass = weekday === '日' ? 'sunday' : 
+                        weekday === '土' ? 'saturday' : '';
+    return (
+      <span className={weekdayClass}>
+        {formatDate(dateStr)}（{weekday}）
+      </span>
+    );
   };
 
   return (
@@ -34,19 +47,19 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
         <tbody>
           {logs.map((log, index) => (
             <tr key={`${log.date}-${index}`}>
-              <td>{formatDate(log.date)}</td>
+              <td>{formatDateWithWeekday(log.date)}</td>
               <td>{formatTime(log.clockIn)}</td>
               <td>{formatTime(log.clockOut)}</td>
               <td>
                 <input
                   type="text"
                   className="break-time-input"
-                  value={log.breakTime || "1:00"}
+                  value={log.breakTime}
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
                   pattern="\d{1,2}:\d{2}"
                 />
               </td>
-              <td className="working-hours">{log.workingHours || "-"}</td>
+              <td className="working-hours">{log.workingHours || '---'}</td>
             </tr>
           ))}
           <tr className="total-row">

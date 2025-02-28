@@ -1,50 +1,63 @@
 /**
- * 日付と時間のフォーマット機能
+ * ISO日付文字列を日本語形式（YYYY年MM月DD日）に変換
+ * @param {string} isoDate - ISO形式の日付文字列
+ * @returns {string} フォーマットされた日付
  */
+export const formatDate = (isoDate) => {
+  if (!isoDate || isoDate === '---') {
+    return '---';
+  }
 
-// 日付のフォーマット (例: 2024-02-28 → 2024年02月28日)
-export const formatDate = (dateStr) => {
   try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      throw new Error('Invalid date');
-    }
-    return new Intl.DateTimeFormat('ja-JP', {
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) throw new Error('Invalid date');
+    return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(date);
+      month: 'long',
+      day: 'numeric'
+    });
   } catch (error) {
     console.error('日付フォーマットエラー:', error);
-    return dateStr;
+    return '---';
   }
 };
 
-// 時刻のフォーマット (例: 2024-02-28T09:00:00Z → 09:00)
-export const formatTime = (timeStr) => {
+/**
+ * ISO時刻文字列を時:分形式に変換
+ * @param {string} isoTime - ISO形式の時刻文字列
+ * @returns {string} フォーマットされた時刻
+ */
+export const formatTime = (isoTime) => {
+  if (!isoTime || isoTime === '---') {
+    return '---';
+  }
+
   try {
-    const date = new Date(timeStr);
-    if (isNaN(date.getTime())) {
-      throw new Error('Invalid time');
-    }
-    return new Intl.DateTimeFormat('ja-JP', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(date);
+    const date = new Date(isoTime);
+    if (isNaN(date.getTime())) throw new Error('Invalid time');
+    return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
   } catch (error) {
     console.error('時刻フォーマットエラー:', error);
-    return timeStr;
+    return '---';
   }
 };
 
-// 月のフォーマット (例: 2024-02 → 2024年02月)
-export const formatMonth = (yearMonth) => {
+/**
+ * ISO日付文字列から曜日を取得
+ * @param {string} isoDate - ISO形式の日付文字列
+ * @returns {string} 曜日（日〜土）
+ */
+export const getWeekday = (isoDate) => {
+  if (!isoDate || isoDate === '---') {
+    return '---';
+  }
+
   try {
-    const [year, month] = yearMonth.split('-');
-    return `${year}年${month}月`;
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) throw new Error('Invalid date');
+    return ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
   } catch (error) {
-    console.error('年月フォーマットエラー:', error);
-    return yearMonth;
+    console.error('曜日取得エラー:', error);
+    return '---';
   }
 };

@@ -1,31 +1,39 @@
 import './styles.css';
-import { formatMonth } from '../../utils/dateUtils';
 
 export function MonthSelect({ value, onChange }) {
-  // 過去6ヶ月分の選択肢を生成
-  const getMonthOptions = () => {
+  // 過去12ヶ月分の選択肢を生成
+  const generateMonthOptions = () => {
     const options = [];
-    const now = new Date();
-    
-    for (let i = 0; i < 6; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const yearMonth = date.toISOString().slice(0, 7); // YYYY-MM形式
-      options.push(yearMonth);
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0-11
+
+    for (let i = 0; i < 12; i++) {
+      let year = currentYear;
+      let month = currentMonth - i;
+
+      if (month < 0) {
+        month += 12;
+        year -= 1;
+      }
+
+      const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const label = `${year}年${month + 1}月`;
+      options.push({ value: yearMonth, label });
     }
-    
+
     return options;
   };
 
   return (
-    <select
+    <select 
       className="month-select"
-      value={value || ''}
+      value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">月を選択</option>
-      {getMonthOptions().map(yearMonth => (
-        <option key={yearMonth} value={yearMonth}>
-          {formatMonth(yearMonth)}
+      {generateMonthOptions().map(option => (
+        <option key={option.value} value={option.value}>
+          {option.label}
         </option>
       ))}
     </select>
