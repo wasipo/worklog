@@ -13,13 +13,15 @@ async function fetchSlackApi(endpoint, params) {
   
   console.info(`Slack API リクエスト: ${endpoint}`, params);
   
-  const response = await fetch(`/slack-api/${endpoint}`, {
-    method: 'POST',  // Slack推奨のメソッドに変更
+  // クエリパラメータをURLに追加
+  const urlParams = new URLSearchParams(params);
+  
+  const response = await fetch(`/slack-api/${endpoint}?${urlParams}`, {
+    method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     },
-    body: JSON.stringify(params),
   });
 
   const data = await response.json();
@@ -143,6 +145,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     const isTestMode = import.meta.env.VITE_USE_MOCK === 'true';
     const token = import.meta.env.VITE_SLACK_TOKEN;
     const channelId = import.meta.env.VITE_SLACK_CHANNEL_ID;
+    const channelName = import.meta.env.VITE_SLACK_CHANNEL_NAME;
 
     // テストモードの場合はモックデータを返す
     if (isTestMode) {
@@ -151,7 +154,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     }
 
     // 本番モードで必要な設定が不足している場合
-    if (!token || !channelId) {
+    if (!token || !channelId || !channelName) {
       throw new Error('Slack APIの設定が不足しています。環境変数を確認してください。');
     }
 
@@ -169,8 +172,8 @@ export async function fetchAttendanceLogs(yearMonth) {
     const afterDate = startDate.toISOString().split('T')[0];
     const beforeDate = endDate.toISOString().split('T')[0];
 
-    // Step 1: メッセージの検索
-    const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:<#${channelId}>`;
+    // Step 1: メッセージの検索（チャンネル名を使用）
+    const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:#${channelName}`;
     console.info('Slack API検索条件:', searchQuery);
 
     const searchResult = await fetchSlackApi('search.messages', {
