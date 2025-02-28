@@ -1,3 +1,10 @@
+// JSTとしてISO8601フォーマットする関数
+function toJstISOString(date) {
+  const offset = 9 * 60; // JSTのオフセットは+9時間（分単位）
+  const localDate = new Date(date.getTime() + offset * 60 * 1000);
+  return localDate.toISOString().replace('Z', '+09:00');
+}
+
 // Slack API用のクライアント設定
 async function fetchSlackApi(endpoint, params) {
   const token = import.meta.env.VITE_SLACK_TOKEN;
@@ -35,7 +42,7 @@ async function fetchSlackApi(endpoint, params) {
 // スレッドの返信を取得する関数
 async function fetchThreadReplies(channelId, ts) {
   const result = await fetchSlackApi('conversations.replies', {
-    channel: channelId,  // チャンネルIDを使用
+    channel: channelId,
     ts,
     limit: 100,
     inclusive: true
@@ -49,13 +56,13 @@ async function fetchThreadReplies(channelId, ts) {
   const firstMessage = result.messages[0];
   const lastMessage = result.messages[result.messages.length - 1];
 
-  // タイムスタンプをJST（UTC+9）に調整して変換
-  const clockIn = new Date(parseFloat(firstMessage.ts) * 1000 + 9 * 3600 * 1000);
-  const clockOut = new Date(parseFloat(lastMessage.ts) * 1000 + 9 * 3600 * 1000);
+  // タイムスタンプをDateオブジェクトに変換（UTC）
+  const clockIn = new Date(parseFloat(firstMessage.ts) * 1000);
+  const clockOut = new Date(parseFloat(lastMessage.ts) * 1000);
 
   return {
-    clockIn: clockIn.toISOString(),
-    clockOut: clockOut.toISOString(),
+    clockIn: toJstISOString(clockIn),
+    clockOut: toJstISOString(clockOut),
     userId: firstMessage.user
   };
 }
@@ -109,8 +116,8 @@ function createMockLogs(yearMonth) {
 
     return {
       date,
-      clockIn: clockIn.toISOString(),
-      clockOut: clockOut.toISOString(),
+      clockIn: toJstISOString(clockIn),
+      clockOut: toJstISOString(clockOut),
       breakTime: '1:00',
       userId: 'U01ABC123DE'
     };
@@ -129,7 +136,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     // 環境変数のチェック
     const isTestMode = import.meta.env.VITE_USE_MOCK === 'true';
     const token = import.meta.env.VITE_SLACK_TOKEN;
-    const channelId = import.meta.env.VITE_SLACK_CHANNEL_ID;  // チャンネルIDを使用
+    const channelId = import.meta.env.VITE_SLACK_CHANNEL_ID;
 
     // テストモードの場合はモックデータを返す
     if (isTestMode) {
@@ -157,7 +164,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     const beforeDate = endDate.toISOString().split('T')[0];
 
     // Step 1: メッセージの検索（エンコードなし）
-    const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:<#${channelId}>`;  // チャンネルIDを使用
+    const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:<#${channelId}>`;
     console.info('Slack API検索条件:', searchQuery);
 
     const searchResult = await fetchSlackApi('search.messages', {
@@ -173,8 +180,8 @@ export async function fetchAttendanceLogs(yearMonth) {
 
     for (const message of messages) {
       try {
-        const threadData = await fetchThreadReplies(channelId, message.ts);  // チャンネルIDを使用
-        const date = new Date(parseFloat(message.ts) * 1000 + 9 * 3600 * 1000)
+        const threadData = await fetchThreadReplies(channelId, message.ts);
+        const date = new Date(parseFloat(message.ts) * 1000)
           .toISOString().split('T')[0];
 
         attendanceLogs[date] = {
