@@ -1,40 +1,49 @@
 // 開発用のモックデータを生成する関数
+
+// ローカル日時をISO形式に変換（UTC変換なし）
+function formatLocalISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+// 日本時間で正確な日時を生成
+function createLocalDate(year, month, day, hours = 0, minutes = 0) {
+  return new Date(year, month - 1, day, hours, minutes, 0);
+}
+
+// 月の全日のモックデータを生成（曜日制限なし）
 function createMockLogs(yearMonth) {
   const logs = [];
   const [year, month] = yearMonth.split('-').map(Number);
-  
-  // 指定された月の日数を取得
   const daysInMonth = new Date(year, month, 0).getDate();
-  
-  // その月の平日のみデータを生成（土日を除く）
+
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month - 1, day);
-    
-    // 土日はスキップ（0=日曜, 6=土曜）
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    
-    // 9:00-18:00のベース時間を設定
-    const clockIn = new Date(date);
-    clockIn.setHours(9, 0, 0, 0);
-    
-    const clockOut = new Date(date);
-    clockOut.setHours(18, 0, 0, 0);
+    const date = createLocalDate(year, month, day);
+
+    const clockIn = createLocalDate(year, month, day, 9, 0);
+    const clockOut = createLocalDate(year, month, day, 18, 0);
 
     logs.push({
-      date: date.toISOString().split('T')[0],
-      clockIn: clockIn.toISOString(),
-      clockOut: clockOut.toISOString(),
+      date: formatLocalISO(date).split('T')[0],
+      clockIn: formatLocalISO(clockIn),
+      clockOut: formatLocalISO(clockOut),
       breakTime: "1:00",
       userId: "U01ABC123DE"
     });
   }
 
-  // 日付順にソート
   logs.sort((a, b) => new Date(a.date) - new Date(b.date));
-  
-  console.info(`モックデータ生成 (${yearMonth}):`, logs);
+
+  console.info(`モックデータ生成（全日取得） (${yearMonth}):`, logs);
   return logs;
 }
+
+
 
 export async function fetchAttendanceLogs(yearMonth) {
   if (!yearMonth) {
@@ -61,10 +70,19 @@ export async function fetchAttendanceLogs(yearMonth) {
       throw new Error('Slack APIの設定が不足しています。環境変数を確認してください。');
     }
 
-    // 検索期間の設定（指定された月の1日から末日まで）
+    // 検索期間を明示的に設定（Slack API用）
     const [year, month] = yearMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 0).toISOString().split('T')[0];
-    const endDate = new Date(year, month, 1).toISOString().split('T')[0];
+
+    // 月初日から1日前（前月末日）
+    const startDateObj = new Date(year, month - 1, 1);
+    startDateObj.setDate(startDateObj.getDate() - 1);
+
+    // 翌月初日
+    const endDateObj = new Date(year, month, 1);
+
+    // ISO8601形式に変換
+    const startDate = startDateObj.toISOString().split('T')[0];
+    const endDate = endDateObj.toISOString().split('T')[0];
 
     console.info('Slack API検索条件:');
     console.info(`- チャンネル: #${channel}`);
