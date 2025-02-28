@@ -1,26 +1,13 @@
 .month-select {
-  appearance: none;
-  background-color: white;
+  padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
-  color: #1f2937;
-  cursor: pointer;
   font-size: 14px;
-  min-width: 140px;
-  padding: 8px 32px 8px 12px;
-  transition: all 0.2s ease;
-}
-
-.month-select:hover {
-  border-color: #3b82f6;
+  min-width: 120px;
+  background-color: white;
 }
 
 .month-select:focus {
-  border-color: #3b82f6;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-.month-select option {
-  padding: 8px;
+  border-color: #3b82f6;
 }

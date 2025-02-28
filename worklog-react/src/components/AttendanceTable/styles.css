@@ -1,7 +1,8 @@
-.attendance-table-container {
+.table-container {
   overflow-x: auto;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-top: 16px;
 }
 
 .attendance-table {
@@ -45,13 +46,17 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-.total-row {
+.attendance-table .total-row {
   font-weight: 600;
   background-color: #f8fafc;
 }
 
-.total-row td {
+.attendance-table .total-row td {
   border-top: 2px solid #e5e7eb;
+}
+
+.working-hours {
+  font-family: monospace;
 }
 
 @media (max-width: 640px) {

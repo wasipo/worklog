@@ -1,30 +1,31 @@
 import './styles.css';
-import { formatYearMonth } from '../../utils/dateUtils';
-import { getSavedMonths } from '../../utils/monthlyData';
-import { useEffect, useState } from 'react';
+import { formatMonth } from '../../utils/dateUtils';
 
 export function MonthSelect({ value, onChange }) {
-  const [months, setMonths] = useState([]);
-
-  useEffect(() => {
-    const savedMonths = getSavedMonths();
-    setMonths(savedMonths);
-
-    if (savedMonths.length > 0 && !value) {
-      onChange?.(savedMonths[0]);
+  // 過去6ヶ月分の選択肢を生成
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    
+    for (let i = 0; i < 6; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yearMonth = date.toISOString().slice(0, 7); // YYYY-MM形式
+      options.push(yearMonth);
     }
-  }, []);
+    
+    return options;
+  };
 
   return (
     <select
       className="month-select"
       value={value || ''}
-      onChange={(e) => onChange?.(e.target.value)}
+      onChange={(e) => onChange(e.target.value)}
     >
       <option value="">月を選択</option>
-      {months.map(month => (
-        <option key={month} value={month}>
-          {formatYearMonth(month)}
+      {getMonthOptions().map(yearMonth => (
+        <option key={yearMonth} value={yearMonth}>
+          {formatMonth(yearMonth)}
         </option>
       ))}
     </select>

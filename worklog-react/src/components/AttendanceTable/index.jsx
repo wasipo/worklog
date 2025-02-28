@@ -1,21 +1,26 @@
 import './styles.css';
 import { formatDate, formatTime } from '../../utils/dateUtils';
-import { calculateWorkingHours } from '../../utils/timeUtils';
 
 export function AttendanceTable({ logs, onBreakTimeChange }) {
-  const totalHours = logs.reduce((acc, log) => {
-    const [hours, minutes] = log.workingHours.split(':').map(Number);
-    return acc + hours * 60 + minutes;
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return null;
+  }
+
+  // 合計時間の計算
+  const totalMinutes = logs.reduce((acc, log) => {
+    if (!log.workingHours) return acc;
+    const [hours, minutes] = log.workingHours.split(':').map(n => parseInt(n, 10));
+    return acc + (hours * 60 + minutes);
   }, 0);
 
-  const formatTotalHours = (minutes) => {
+  const formatTotal = (minutes) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}:${mins.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="attendance-table-container">
+    <div className="table-container">
       <table className="attendance-table">
         <thead>
           <tr>
@@ -28,7 +33,7 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
         </thead>
         <tbody>
           {logs.map((log, index) => (
-            <tr key={index}>
+            <tr key={`${log.date}-${index}`}>
               <td>{formatDate(log.date)}</td>
               <td>{formatTime(log.clockIn)}</td>
               <td>{formatTime(log.clockOut)}</td>
@@ -36,18 +41,17 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
                 <input
                   type="text"
                   className="break-time-input"
-                  value={log.breakTime}
+                  value={log.breakTime || "1:00"}
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
                   pattern="\d{1,2}:\d{2}"
-                  title="休憩時間は「時:分」の形式で入力してください"
                 />
               </td>
-              <td>{log.workingHours}</td>
+              <td className="working-hours">{log.workingHours || "-"}</td>
             </tr>
           ))}
           <tr className="total-row">
-            <td colSpan="4">合計稼働時間</td>
-            <td>{formatTotalHours(totalHours)}</td>
+            <td colSpan="4" style={{ textAlign: 'right' }}>合計稼働時間:</td>
+            <td className="working-hours">{formatTotal(totalMinutes)}</td>
           </tr>
         </tbody>
       </table>
