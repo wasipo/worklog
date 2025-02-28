@@ -37,9 +37,18 @@
   transition: all 0.2s ease-in-out;
 }
 
+/* 休憩メッセージがある場合のスタイル */
 .break-time-input.highlight {
   border: 2px solid #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* 休日の入力欄を無効化 */
+.break-time-input:disabled {
+  background-color: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 .working-hours {
@@ -51,22 +60,33 @@
   font-weight: 500;
 }
 
-/* 土日の色分け */
-.sunday {
-  color: #dc2626;
-}
-
-.saturday {
-  color: #2563eb;
-}
-
-/* 休日行の背景色 */
-.attendance-table tr:has(.sunday),
-.attendance-table tr:has(.saturday) {
+/* 休日行のスタイル */
+.holiday-row {
   background-color: #f9fafb;
+  color: #6b7280;
+}
+
+.holiday-row:hover {
+  background-color: #f3f4f6;
 }
 
 /* ホバー効果 */
 .attendance-table tbody tr:hover {
   background-color: #f3f4f6;
+}
+
+/* 入力欄のホバー効果 */
+.break-time-input:not(:disabled):hover {
+  border-color: #60a5fa;
+}
+
+.break-time-input:not(:disabled):focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* 休憩記録ありの入力欄のホバーツールチップ */
+.break-time-input[title] {
+  cursor: help;
 }

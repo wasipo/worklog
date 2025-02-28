@@ -1,3 +1,5 @@
+import { calculateWorkingHours } from '../utils/timeUtils';
+
 // JSTとしてISO8601フォーマットする関数
 function toJstISOString(date) {
   const offset = 9 * 60; // JSTのオフセットは+9時間（分単位）
@@ -11,15 +13,13 @@ async function fetchSlackApi(endpoint, params) {
   
   console.info(`Slack API リクエスト: ${endpoint}`, params);
   
-  // クエリパラメータをURLエンコード
-  const urlParams = new URLSearchParams(params);
-  
-  const response = await fetch(`/slack-api/${endpoint}?${urlParams}`, {
-    method: 'GET',
+  const response = await fetch(`/slack-api/${endpoint}`, {
+    method: 'POST',  // Slack推奨のメソッドに変更
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify(params),
   });
 
   const data = await response.json();
@@ -56,18 +56,19 @@ async function fetchThreadReplies(channelId, ts) {
   const firstMessage = result.messages[0];
   const lastMessage = result.messages[result.messages.length - 1];
 
-  // 最後のメッセージに「休憩」という文字列が含まれているかチェック
-  const hasBreakMessage = /休憩/.test(lastMessage.text || '');
+  // スレッド内の全メッセージを対象に休憩メッセージをチェック
+  const hasBreakMessage = result.messages.some(msg => /休憩/.test(msg.text || ''));
 
   // タイムスタンプをDateオブジェクトに変換（UTC）
-  const clockIn = new Date(parseFloat(firstMessage.ts) * 1000);
-  const clockOut = new Date(parseFloat(lastMessage.ts) * 1000);
+  const clockIn = toJstISOString(new Date(parseFloat(firstMessage.ts) * 1000));
+  const clockOut = toJstISOString(new Date(parseFloat(lastMessage.ts) * 1000));
 
   return {
-    clockIn: toJstISOString(clockIn),
-    clockOut: toJstISOString(clockOut),
+    clockIn,
+    clockOut,
+    breakTime: '1:00',
     userId: firstMessage.user,
-    hasBreakMessage // 休憩情報を追加
+    hasBreakMessage
   };
 }
 
@@ -96,6 +97,7 @@ function createEmptyLog(date) {
     clockOut: '---',
     breakTime: '---',
     userId: '---',
+    workingHours: '---',
     hasBreakMessage: false
   };
 }
@@ -106,26 +108,24 @@ function createMockLogs(yearMonth) {
   const dates = generateMonthDates(yearMonth);
   
   return dates.map(date => {
-    const currentDate = new Date(date);
-    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
-    
-    if (isWeekend) {
-      return createEmptyLog(date);
-    }
-
     const clockIn = new Date(date);
     clockIn.setHours(9, 0, 0, 0);
     
     const clockOut = new Date(date);
     clockOut.setHours(18, 0, 0, 0);
 
+    const clockInStr = toJstISOString(clockIn);
+    const clockOutStr = toJstISOString(clockOut);
+    const breakTime = '1:00';
+
     return {
       date,
-      clockIn: toJstISOString(clockIn),
-      clockOut: toJstISOString(clockOut),
-      breakTime: '1:00',
+      clockIn: clockInStr,
+      clockOut: clockOutStr,
+      breakTime,
+      workingHours: calculateWorkingHours(clockInStr, clockOutStr, breakTime),
       userId: 'U01ABC123DE',
-      hasBreakMessage: true // モックデータではtrue
+      hasBreakMessage: Math.random() > 0.5  // ランダムにフラグを設定
     };
   });
 }
@@ -169,7 +169,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     const afterDate = startDate.toISOString().split('T')[0];
     const beforeDate = endDate.toISOString().split('T')[0];
 
-    // Step 1: メッセージの検索（エンコードなし）
+    // Step 1: メッセージの検索
     const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:<#${channelId}>`;
     console.info('Slack API検索条件:', searchQuery);
 
@@ -190,10 +190,11 @@ export async function fetchAttendanceLogs(yearMonth) {
         const date = new Date(parseFloat(message.ts) * 1000)
           .toISOString().split('T')[0];
 
+        // 稼働時間を計算して追加
         attendanceLogs[date] = {
           date,
           ...threadData,
-          breakTime: '1:00' // デフォルトの休憩時間
+          workingHours: calculateWorkingHours(threadData.clockIn, threadData.clockOut, threadData.breakTime)
         };
       } catch (error) {
         console.warn(`スレッドの取得に失敗: ${error.message}`);

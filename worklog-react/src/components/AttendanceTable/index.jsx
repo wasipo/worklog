@@ -23,14 +23,15 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
   const formatDateWithWeekday = (dateStr) => {
     if (!dateStr || dateStr === '---') return '---';
     const weekday = getWeekday(dateStr);
-    const weekdayClass = weekday === '日' ? 'sunday' : 
-                        weekday === '土' ? 'saturday' : '';
     return (
-      <span className={weekdayClass}>
+      <span>
         {formatDate(dateStr)}（{weekday}）
       </span>
     );
   };
+
+  // 休日判定（打刻データがない日）
+  const isHoliday = (log) => log.clockIn === '---' && log.clockOut === '---';
 
   return (
     <div className="table-container">
@@ -46,7 +47,10 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
         </thead>
         <tbody>
           {logs.map((log, index) => (
-            <tr key={`${log.date}-${index}`}>
+            <tr 
+              key={`${log.date}-${index}`}
+              className={isHoliday(log) ? 'holiday-row' : ''}
+            >
               <td>{formatDateWithWeekday(log.date)}</td>
               <td>{formatTime(log.clockIn)}</td>
               <td>{formatTime(log.clockOut)}</td>
@@ -58,6 +62,7 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
                   pattern="\d{1,2}:\d{2}"
                   title={log.hasBreakMessage ? '休憩の記録があります' : undefined}
+                  disabled={isHoliday(log)}
                 />
               </td>
               <td className="working-hours">{log.workingHours || '---'}</td>
