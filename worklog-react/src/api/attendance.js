@@ -63,8 +63,8 @@ export async function fetchAttendanceLogs(yearMonth) {
 
     // 検索期間の設定（指定された月の1日から末日まで）
     const [year, month] = yearMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    const startDate = new Date(year, month - 1, 0).toISOString().split('T')[0];
+    const endDate = new Date(year, month, 1).toISOString().split('T')[0];
 
     console.info('Slack API検索条件:');
     console.info(`- チャンネル: #${channel}`);
