@@ -56,6 +56,9 @@ async function fetchThreadReplies(channelId, ts) {
   const firstMessage = result.messages[0];
   const lastMessage = result.messages[result.messages.length - 1];
 
+  // 最後のメッセージに「休憩」という文字列が含まれているかチェック
+  const hasBreakMessage = /休憩/.test(lastMessage.text || '');
+
   // タイムスタンプをDateオブジェクトに変換（UTC）
   const clockIn = new Date(parseFloat(firstMessage.ts) * 1000);
   const clockOut = new Date(parseFloat(lastMessage.ts) * 1000);
@@ -63,7 +66,8 @@ async function fetchThreadReplies(channelId, ts) {
   return {
     clockIn: toJstISOString(clockIn),
     clockOut: toJstISOString(clockOut),
-    userId: firstMessage.user
+    userId: firstMessage.user,
+    hasBreakMessage // 休憩情報を追加
   };
 }
 
@@ -91,7 +95,8 @@ function createEmptyLog(date) {
     clockIn: '---',
     clockOut: '---',
     breakTime: '---',
-    userId: '---'
+    userId: '---',
+    hasBreakMessage: false
   };
 }
 
@@ -119,7 +124,8 @@ function createMockLogs(yearMonth) {
       clockIn: toJstISOString(clockIn),
       clockOut: toJstISOString(clockOut),
       breakTime: '1:00',
-      userId: 'U01ABC123DE'
+      userId: 'U01ABC123DE',
+      hasBreakMessage: true // モックデータではtrue
     };
   });
 }

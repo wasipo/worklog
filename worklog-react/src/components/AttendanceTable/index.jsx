@@ -53,10 +53,11 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
               <td>
                 <input
                   type="text"
-                  className="break-time-input"
+                  className={`break-time-input ${log.hasBreakMessage ? 'highlight' : ''}`}
                   value={log.breakTime}
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
                   pattern="\d{1,2}:\d{2}"
+                  title={log.hasBreakMessage ? '休憩の記録があります' : undefined}
                 />
               </td>
               <td className="working-hours">{log.workingHours || '---'}</td>
