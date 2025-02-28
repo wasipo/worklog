@@ -162,15 +162,12 @@ export async function fetchAttendanceLogs(yearMonth) {
     const allDates = generateMonthDates(yearMonth);
     console.info('生成された日付一覧:', allDates);
 
-    // 検索期間の設定（今月1日から翌月1日の範囲）
+    // 検索期間の設定（対象月の前日から翌月初日まで）
     const [year, month] = yearMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1);  // 今月1日
-    startDate.setDate(startDate.getDate() - 1);      // 前日指定（after用）
-    const endDate = new Date(year, month, 1);        // 翌月1日（before用）
+    const afterDate = new Date(year, month - 1, 0).toISOString().split('T')[0];  // 前月末日
+    const beforeDate = new Date(year, month, 1).toISOString().split('T')[0];     // 翌月初日
     
-    // Slack API用の日付フォーマット
-    const afterDate = startDate.toISOString().split('T')[0];
-    const beforeDate = endDate.toISOString().split('T')[0];
+    console.info('検索期間:', { afterDate, beforeDate });
 
     // Step 1: メッセージの検索（チャンネル名を使用）
     const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:#${channelName}`;
