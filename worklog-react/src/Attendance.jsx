@@ -1,115 +1,115 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MonthSelect } from './components/MonthSelect';
 import { AttendanceTable } from './components/AttendanceTable';
-import { saveMonthlyData, getMonthlyData } from './utils/monthlyData';
-import { calculateWorkingHours } from './utils/timeUtils';
 import { fetchAttendanceLogs } from './api/attendance';
+import { calculateWorkingHours, isValidBreakTime, devError } from './utils/timeUtils';
+
+// デフォルトの月を取得（現在の月）
+function getDefaultMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export function Attendance() {
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedMonth, setSelectedMonth] = useState(getDefaultMonth());
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
-  const handleFetchLogs = async () => {
-    setLoading(true);
+  // データ取得
+  const fetchData = async (yearMonth) => {
+    setIsLoading(true);
     setError(null);
-
     try {
-      const data = await fetchAttendanceLogs(selectedMonth);
-      const processedLogs = data.map(log => ({
-        ...log,
-        breakTime: log.breakTime || '1:00',
-        workingHours: calculateWorkingHours(log.clockIn, log.clockOut, log.breakTime || '1:00')
-      }));
-      setLogs(processedLogs);
-
-      if (processedLogs.length > 0) {
-        saveMonthlyData(selectedMonth, processedLogs);
-      }
-    } catch (error) {
-      console.error('データ取得エラー:', error);
-      setError(error.message || '勤怠データの取得に失敗しました。もう一度お試しください。');
-      setLogs([]);
+      const data = await fetchAttendanceLogs(yearMonth);
+      setLogs(data);
+    } catch (err) {
+      setError(err.message);
+      devError('データ取得エラー:', err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleMonthChange = (month) => {
-    setSelectedMonth(month);
-    setLogs([]); // 月を変更したら既存のデータをクリア
-    setError(null);
+  // 月選択時の処理
+  const handleMonthChange = (yearMonth) => {
+    setSelectedMonth(yearMonth);
   };
 
+  // 休憩時間変更時の処理
   const handleBreakTimeChange = (index, breakTime) => {
-    if (!breakTime.match(/^\d{1,2}:\d{2}$/)) return;
-
     const updatedLogs = logs.map((log, i) => {
       if (i === index) {
-        return {
-          ...log,
-          breakTime,
-          workingHours: calculateWorkingHours(log.clockIn, log.clockOut, breakTime)
-        };
+        // 常に入力値は受け入れる
+        const newLog = { ...log, breakTime };
+        
+        // フォーマットが正しい場合のみ稼働時間を更新
+        if (isValidBreakTime(breakTime)) {
+          newLog.workingHours = calculateWorkingHours(log.clockIn, log.clockOut, breakTime);
+        }
+        
+        return newLog;
       }
       return log;
     });
 
     setLogs(updatedLogs);
-    if (selectedMonth) {
-      saveMonthlyData(selectedMonth, updatedLogs);
+  };
+
+  // フォーカスが外れた時のバリデーション
+  const handleBreakTimeBlur = (index) => {
+    const log = logs[index];
+    if (!isValidBreakTime(log.breakTime)) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [index]: '無効な形式です。1:00に戻します。'
+      }));
+
+      const updatedLogs = [...logs];
+      updatedLogs[index] = {
+        ...log,
+        breakTime: '1:00',
+        workingHours: calculateWorkingHours(log.clockIn, log.clockOut, '1:00')
+      };
+      setLogs(updatedLogs);
+
+      // 3秒後にエラーメッセージを消去
+      setTimeout(() => {
+        setValidationErrors(prev => {
+          const updated = { ...prev };
+          delete updated[index];
+          return updated;
+        });
+      }, 3000);
     }
   };
 
+  // 初回読み込み時とmonth変更時
+  useEffect(() => {
+    fetchData(selectedMonth);
+  }, [selectedMonth]);
+
+  // ローディング表示
+  if (isLoading) {
+    return <div className="loading">データを読み込み中...</div>;
+  }
+
+  // エラー表示
+  if (error) {
+    return <div className="error-message">エラーが発生しました: {error}</div>;
+  }
+
   return (
     <div className="attendance-container">
-      <div className="attendance-header">
-        <MonthSelect
-          value={selectedMonth}
-          onChange={handleMonthChange}
-        />
-        <button
-          className="fetch-button"
-          onClick={handleFetchLogs}
-          disabled={loading}
-        >
-          {loading && <div className="loading-spinner" />}
-          {loading ? 'データを取得中...' : '勤怠記録を取得'}
-        </button>
-      </div>
-
-      {error && (
-        <div className="error-message">
-          <p>{error}</p>
-          {!import.meta.env.VITE_SLACK_TOKEN && (
-            <p className="error-hint">
-              開発モード: .envファイルにSlackトークンが設定されていません
-            </p>
-          )}
-        </div>
-      )}
-
-      {loading && <div className="loading-message">データを取得しています...</div>}
-
-      {!loading && logs.length > 0 && (
-        <AttendanceTable
-          logs={logs}
-          onBreakTimeChange={handleBreakTimeChange}
-        />
-      )}
-
-      {!loading && !error && logs.length === 0 && (
-        <p className="empty-message">
-          勤怠記録を取得してください<br />
-          <span style={{ fontSize: '0.9em', color: '#9ca3af' }}>
-            {selectedMonth.replace('-', '年')}月の記録を取得します
-          </span>
-        </p>
-      )}
+      <h1>勤怠記録</h1>
+      <MonthSelect value={selectedMonth} onChange={handleMonthChange} />
+      <AttendanceTable
+        logs={logs}
+        onBreakTimeChange={handleBreakTimeChange}
+        onBreakTimeBlur={handleBreakTimeBlur}
+        validationErrors={validationErrors}
+      />
     </div>
   );
 }

@@ -1,44 +1,43 @@
-/**
- * 時間計算ユーティリティ
- */
+// 時間フォーマットのバリデーション
+export const isValidBreakTime = (breakTime) => /^\d{1,2}:\d{2}$/.test(breakTime);
 
-// 稼働時間を計算 (clockIn, clockOut, breakTimeから実際の稼働時間を計算)
-export const calculateWorkingHours = (clockIn, clockOut, breakTime = '1:00') => {
+// 稼働時間の計算
+export const calculateWorkingHours = (clockIn, clockOut, breakTime) => {
+  if (clockIn === '---' || clockOut === '---' || breakTime === '---') {
+    return '---';
+  }
+
   try {
-    // 入力チェック（空または'---'の場合）
-    if (!clockIn || !clockOut || clockIn === '---' || clockOut === '---') {
-      return '---';
-    }
-
-    // 出退勤時刻をDateオブジェクトに変換
-    const startTime = new Date(clockIn);
-    const endTime = new Date(clockOut);
-
-    // 日付が不正な場合
-    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-      return '---';
-    }
-
-    // 休憩時間を分に変換
-    const [breakHours, breakMinutes] = breakTime.split(':').map(Number);
-    const breakInMinutes = (breakHours * 60) + breakMinutes;
-
-    // 総稼働時間を計算（ミリ秒を分に変換し、休憩時間を引く）
-    const totalMinutes = Math.floor((endTime - startTime) / (1000 * 60)) - breakInMinutes;
-
-    if (totalMinutes <= 0) {
-      return '0:00';
-    }
-
-    // 時間と分に分割
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    // HH:MM形式で返す
-    return `${hours}:${minutes.toString().padStart(2, '0')}`;
-
+    const start = new Date(clockIn);
+    const end = new Date(clockOut);
+    
+    // 休憩時間をパース
+    const [breakHours, breakMinutes] = breakTime.split(':').map(n => parseInt(n, 10));
+    const breakDuration = (breakHours * 60 + breakMinutes) * 60 * 1000;
+    
+    // 稼働時間を計算（ミリ秒）
+    const duration = end.getTime() - start.getTime() - breakDuration;
+    
+    // 時間と分に変換
+    const hours = Math.floor(duration / (1000 * 60 * 60));
+    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}:${String(minutes).padStart(2, '0')}`;
   } catch (error) {
     console.error('稼働時間計算エラー:', error);
     return '---';
+  }
+};
+
+// 開発環境のみのログ出力
+export const devLog = (...args) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
+export const devError = (...args) => {
+  if (import.meta.env.DEV) {
+    console.error(...args);
   }
 };

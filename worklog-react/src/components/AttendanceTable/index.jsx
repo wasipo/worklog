@@ -1,7 +1,7 @@
 import './styles.css';
 import { formatDate, formatTime, getWeekday } from '../../utils/dateUtils';
 
-export function AttendanceTable({ logs, onBreakTimeChange }) {
+export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, validationErrors }) {
   if (!Array.isArray(logs) || logs.length === 0) {
     return null;
   }
@@ -31,7 +31,27 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
   };
 
   // 休日判定（打刻データがない日）
-  const isHoliday = (log) => log.clockIn === '---' && log.clockOut === '---';
+  const isHoliday = (log) => {
+    // 明示的な休日フラグがある場合はそれを使用
+    if (log.isHoliday !== undefined) return log.isHoliday;
+    // 後方互換性のため、打刻データがない場合も休日とみなす
+    return log.clockIn === '---' && log.clockOut === '---';
+  };
+
+  // 入力フィールドのツールチップ表示
+  const getInputTitle = (log, index) => {
+    if (validationErrors[index]) return validationErrors[index];
+    if (log.hasBreakMessage) return '休憩の記録があります';
+    return undefined;
+  };
+
+  // 入力フィールドのクラス名
+  const getInputClassName = (log, index) => {
+    const classes = ['break-time-input'];
+    if (log.hasBreakMessage) classes.push('highlight');
+    if (validationErrors[index]) classes.push('error');
+    return classes.join(' ');
+  };
 
   return (
     <div className="table-container">
@@ -49,21 +69,28 @@ export function AttendanceTable({ logs, onBreakTimeChange }) {
           {logs.map((log, index) => (
             <tr 
               key={`${log.date}-${index}`}
-              className={isHoliday(log) ? 'holiday-row' : ''}
+              className={isHoliday(log) ? 'holiday-row' : undefined}
             >
               <td>{formatDateWithWeekday(log.date)}</td>
               <td>{formatTime(log.clockIn)}</td>
               <td>{formatTime(log.clockOut)}</td>
-              <td>
+              <td className="break-time-cell">
                 <input
                   type="text"
-                  className={`break-time-input ${log.hasBreakMessage ? 'highlight' : ''}`}
+                  className={getInputClassName(log, index)}
                   value={log.breakTime}
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
+                  onBlur={() => onBreakTimeBlur(index)}
                   pattern="\d{1,2}:\d{2}"
-                  title={log.hasBreakMessage ? '休憩の記録があります' : undefined}
+                  title={getInputTitle(log, index)}
+                  placeholder="1:00"
                   disabled={isHoliday(log)}
                 />
+                {validationErrors[index] && (
+                  <div className="validation-error-tooltip">
+                    {validationErrors[index]}
+                  </div>
+                )}
               </td>
               <td className="working-hours">{log.workingHours || '---'}</td>
             </tr>
