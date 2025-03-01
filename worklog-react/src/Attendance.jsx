@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MonthSelect } from './components/MonthSelect';
 import { AttendanceTable } from './components/AttendanceTable';
 import { fetchAttendanceLogs } from './api/attendance';
-import { calculateWorkingHours, devError } from './utils/timeUtils';
+import { calculateWorkingHours, isValidBreakTime, devError } from './utils/timeUtils';
 import './Attendance.css';
 
 // デフォルトの月を取得（現在の月）
@@ -46,7 +46,7 @@ export function Attendance() {
         const newLog = { ...log, breakTime };
         
         // フォーマットが正しい場合のみ稼働時間を更新
-        if (breakTime.match(/^\d{1,2}:\d{2}$/)) {
+        if (isValidBreakTime(breakTime)) {
           newLog.workingHours = calculateWorkingHours(log.clockIn, log.clockOut, breakTime);
         }
         
@@ -61,7 +61,7 @@ export function Attendance() {
   // フォーカスが外れた時のバリデーション
   const handleBreakTimeBlur = (index) => {
     const log = logs[index];
-    if (!log.breakTime.match(/^\d{1,2}:\d{2}$/)) {
+    if (!isValidBreakTime(log.breakTime)) {
       setValidationErrors(prev => ({
         ...prev,
         [index]: '無効な形式です。1:00に戻します。'
@@ -89,20 +89,7 @@ export function Attendance() {
   // ログの削除処理
   const handleDeleteLog = (index) => {
     if (window.confirm('この日の勤怠データを削除しますか？')) {
-      const updatedLogs = logs.map((log, i) => {
-        if (i === index) {
-          // 空のログデータで置き換え
-          return {
-            ...log,
-            clockIn: '---',
-            clockOut: '---',
-            breakTime: '---',
-            workingHours: '---',
-            hasBreakMessage: false
-          };
-        }
-        return log;
-      });
+      const updatedLogs = logs.filter((_, i) => i !== index);
       setLogs(updatedLogs);
     }
   };

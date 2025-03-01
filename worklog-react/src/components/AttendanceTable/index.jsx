@@ -38,10 +38,8 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, onDe
     return log.clockIn === '---' && log.clockOut === '---';
   };
 
-  // 削除ボタンの表示条件
-  const showDeleteButton = (log) => {
-    return !isHoliday(log) && log.clockIn !== '---' && log.clockOut !== '---';
-  };
+  // 削除ボタンの表示条件（全てのレコードで表示）
+  const showDeleteButton = () => true;
 
   return (
     <div className="table-container">
@@ -85,11 +83,11 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, onDe
               </td>
               <td className="working-hours">{log.workingHours || '---'}</td>
               <td>
-                {showDeleteButton(log) && (
+                {showDeleteButton() && (
                   <button 
                     onClick={() => onDelete(index)}
                     className="delete-button"
-                    title="この日の勤怠データを削除"
+                    title="この日のデータを削除"
                   >
                     削除
                   </button>
