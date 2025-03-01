@@ -8,15 +8,14 @@ function getSlackApiDateRange(yearMonth) {
   const afterDate = new Date(Date.UTC(year, month - 1, 1));
   afterDate.setUTCDate(afterDate.getUTCDate() - 1);
   
-  // 翌月の1日をUTCで取得
-  const beforeDate = new Date(Date.UTC(year, month, 1));
+  // 翌月の1日を取得し、さらに1日延ばして翌月の2日に設定（1日延長）
+  const beforeDate = new Date(Date.UTC(year, month, 2));
   
   return {
     afterDateStr: afterDate.toISOString().split('T')[0],
     beforeDateStr: beforeDate.toISOString().split('T')[0],
   };
 }
-
 // Slack API用のクライアント設定
 async function fetchSlackApi(endpoint, params) {
   const token = import.meta.env.VITE_SLACK_TOKEN;
