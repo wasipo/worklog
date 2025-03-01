@@ -1,17 +1,27 @@
-import { calculateWorkingHours } from '../utils/timeUtils';
+import { calculateWorkingHours, toJstISOString, devLog, devError } from '../utils/timeUtils';
 
-// JSTとしてISO8601フォーマットする関数
-function toJstISOString(date) {
-  const offset = 9 * 60; // JSTのオフセットは+9時間（分単位）
-  const localDate = new Date(date.getTime() + offset * 60 * 1000);
-  return localDate.toISOString().replace('Z', '+09:00');
+// 検索用の日付範囲をUTC基準で計算する関数
+function getSlackApiDateRange(yearMonth) {
+  const [year, month] = yearMonth.split('-').map(Number);
+  
+  // 対象月の前日をUTCで取得
+  const afterDate = new Date(Date.UTC(year, month - 1, 1));
+  afterDate.setUTCDate(afterDate.getUTCDate() - 1);
+  
+  // 翌月の1日をUTCで取得
+  const beforeDate = new Date(Date.UTC(year, month, 1));
+  
+  return {
+    afterDateStr: afterDate.toISOString().split('T')[0],
+    beforeDateStr: beforeDate.toISOString().split('T')[0],
+  };
 }
 
 // Slack API用のクライアント設定
 async function fetchSlackApi(endpoint, params) {
   const token = import.meta.env.VITE_SLACK_TOKEN;
   
-  console.info(`Slack API リクエスト: ${endpoint}`, params);
+  devLog(`Slack API リクエスト: ${endpoint}`, params);
   
   // クエリパラメータをURLに追加
   const urlParams = new URLSearchParams(params);
@@ -27,17 +37,16 @@ async function fetchSlackApi(endpoint, params) {
   const data = await response.json();
   
   if (!data.ok) {
-    console.error('Slack API エラーレスポンス:', data);
+    devError('Slack API エラーレスポンス:', data);
     throw new Error(`Slack API Error: ${data.error || '不明なエラー'}`);
   }
 
-  // レスポンスの型チェック
   if (endpoint === 'search.messages' && (!data.messages || !Array.isArray(data.messages.matches))) {
-    console.error('予期しないレスポンス形式:', data);
+    devError('予期しないレスポンス形式:', data);
     throw new Error('検索結果が正しい形式ではありません');
   }
 
-  console.info(`Slack API レスポンス: ${endpoint}`, data);
+  devLog(`Slack API レスポンス: ${endpoint}`, data);
   return data;
 }
 
@@ -61,7 +70,7 @@ async function fetchThreadReplies(channelId, ts) {
   // スレッド内の全メッセージを対象に休憩メッセージをチェック
   const hasBreakMessage = result.messages.some(msg => /休憩/.test(msg.text || ''));
 
-  // タイムスタンプをDateオブジェクトに変換（UTC）
+  // タイムスタンプをDateオブジェクトに変換し、JSTのISO文字列に変換
   const clockIn = toJstISOString(new Date(parseFloat(firstMessage.ts) * 1000));
   const clockOut = toJstISOString(new Date(parseFloat(lastMessage.ts) * 1000));
 
@@ -110,6 +119,13 @@ function createMockLogs(yearMonth) {
   const dates = generateMonthDates(yearMonth);
   
   return dates.map(date => {
+    const currentDate = new Date(date);
+    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+    
+    if (isWeekend) {
+      return createEmptyLog(date);
+    }
+
     const clockIn = new Date(date);
     clockIn.setHours(9, 0, 0, 0);
     
@@ -127,7 +143,7 @@ function createMockLogs(yearMonth) {
       breakTime,
       workingHours: calculateWorkingHours(clockInStr, clockOutStr, breakTime),
       userId: 'U01ABC123DE',
-      hasBreakMessage: Math.random() > 0.5  // ランダムにフラグを設定
+      hasBreakMessage: Math.random() > 0.5
     };
   });
 }
@@ -149,7 +165,7 @@ export async function fetchAttendanceLogs(yearMonth) {
 
     // テストモードの場合はモックデータを返す
     if (isTestMode) {
-      console.info(`テストモード: ${yearMonth}のモックデータを使用します`);
+      devLog(`テストモード: ${yearMonth}のモックデータを使用します`);
       return createMockLogs(yearMonth);
     }
 
@@ -158,20 +174,17 @@ export async function fetchAttendanceLogs(yearMonth) {
       throw new Error('Slack APIの設定が不足しています。環境変数を確認してください。');
     }
 
-    // Step 3: 月の全日付を生成
+    // Step 1: 月の全日付を生成
     const allDates = generateMonthDates(yearMonth);
-    console.info('生成された日付一覧:', allDates);
+    devLog('生成された日付一覧:', allDates);
 
-    // 検索期間の設定（対象月の前日から翌月初日まで）
-    const [year, month] = yearMonth.split('-').map(Number);
-    const afterDate = new Date(year, month - 1, 0).toISOString().split('T')[0];  // 前月末日
-    const beforeDate = new Date(year, month, 1).toISOString().split('T')[0];     // 翌月初日
-    
-    console.info('検索期間:', { afterDate, beforeDate });
+    // Step 2: 検索期間の設定（UTC基準で計算）
+    const { afterDateStr, beforeDateStr } = getSlackApiDateRange(yearMonth);
+    devLog('検索期間:', { afterDateStr, beforeDateStr });
 
-    // Step 1: メッセージの検索（チャンネル名を使用）
-    const searchQuery = `"開始します" after:${afterDate} before:${beforeDate} in:#${channelName}`;
-    console.info('Slack API検索条件:', searchQuery);
+    // Step 3: メッセージの検索（チャンネル名を使用）
+    const searchQuery = `"開始します" after:${afterDateStr} before:${beforeDateStr} in:#${channelName}`;
+    devLog('Slack API検索条件:', searchQuery);
 
     const searchResult = await fetchSlackApi('search.messages', {
       query: searchQuery,
@@ -180,15 +193,16 @@ export async function fetchAttendanceLogs(yearMonth) {
       count: 100,
     });
 
-    // Step 2: 各スレッドの打刻データを取得
+    // Step 4: 各スレッドの打刻データを取得
     const attendanceLogs = {};
     const messages = searchResult.messages?.matches || [];
 
     for (const message of messages) {
       try {
         const threadData = await fetchThreadReplies(channelId, message.ts);
-        const date = new Date(parseFloat(message.ts) * 1000)
-          .toISOString().split('T')[0];
+        // メッセージのタイムスタンプからJSTの日付を取得
+        const messageDate = new Date(parseFloat(message.ts) * 1000);
+        const date = toJstISOString(messageDate).split('T')[0];
 
         // 稼働時間を計算して追加
         attendanceLogs[date] = {
@@ -197,23 +211,23 @@ export async function fetchAttendanceLogs(yearMonth) {
           workingHours: calculateWorkingHours(threadData.clockIn, threadData.clockOut, threadData.breakTime)
         };
       } catch (error) {
-        console.warn(`スレッドの取得に失敗: ${error.message}`);
+        devError(`スレッドの取得に失敗: ${error.message}`);
       }
 
       // APIレートリミット対策（1秒間隔）
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // Step 4 & 5: 全日付のデータを作成し、ソート
+    // Step 5: 全日付のデータを作成し、ソート
     const finalLogs = allDates.map(date => 
       attendanceLogs[date] || createEmptyLog(date)
     );
 
-    console.info('最終データ:', finalLogs);
+    devLog('最終データ:', finalLogs);
     return finalLogs;
 
   } catch (error) {
-    console.error('データ取得エラー:', error);
+    devError('データ取得エラー:', error);
     throw new Error(`Slack APIエラー: ${error.message}`);
   }
 }
