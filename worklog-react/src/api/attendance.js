@@ -162,6 +162,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     const token = import.meta.env.VITE_SLACK_TOKEN;
     const channelId = import.meta.env.VITE_SLACK_CHANNEL_ID;
     const channelName = import.meta.env.VITE_SLACK_CHANNEL_NAME;
+    const searchKeyword = import.meta.env.VITE_SLACK_SEARCH_KEYWORD || '開始します';
 
     // テストモードの場合はモックデータを返す
     if (isTestMode) {
@@ -183,7 +184,7 @@ export async function fetchAttendanceLogs(yearMonth) {
     devLog('検索期間:', { afterDateStr, beforeDateStr });
 
     // Step 3: メッセージの検索（チャンネル名を使用）
-    const searchQuery = `"開始します" after:${afterDateStr} before:${beforeDateStr} in:#${channelName}`;
+    const searchQuery = `"${searchKeyword}" after:${afterDateStr} before:${beforeDateStr} in:#${channelName}`;
     devLog('Slack API検索条件:', searchQuery);
 
     const searchResult = await fetchSlackApi('search.messages', {
