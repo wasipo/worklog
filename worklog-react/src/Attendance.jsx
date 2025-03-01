@@ -83,7 +83,6 @@ export function Attendance() {
 
   return (
     <div className="attendance-container">
-      <h1>勤怠記録</h1>
       <div className="attendance-header">
         <MonthSelect value={selectedMonth} onChange={handleMonthChange} />
         <button

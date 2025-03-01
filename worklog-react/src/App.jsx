@@ -14,7 +14,7 @@ function App() {
         marginBottom: '2rem',
         textAlign: 'center'
       }}>
-        勤怠管理システム
+        勤怠記録閲覧・修正
       </h1>
       <Attendance />
     </div>
