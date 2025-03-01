@@ -7,6 +7,22 @@ export const toJstISOString = (date) => {
   return jstDate.toISOString().replace('Z', '+09:00');
 };
 
+// Slack APIの検索用に日付範囲を計算する関数
+export const getSlackSearchRange = (yearMonth) => {
+  const [year, month] = yearMonth.split('-').map(Number);
+
+  // JSTの月初日の前日をafterに指定（UTC日付に変換不要）
+  const afterDate = new Date(year, month - 1, 1);
+  afterDate.setDate(afterDate.getDate() - 1);
+  const afterDateStr = afterDate.toISOString().split('T')[0];
+
+  // 翌月1日をbeforeに指定（UTC日付に変換不要）
+  const beforeDate = new Date(year, month, 1);
+  const beforeDateStr = beforeDate.toISOString().split('T')[0];
+
+  return { afterDate: afterDateStr, beforeDate: beforeDateStr };
+};
+
 // 稼働時間の計算
 export const calculateWorkingHours = (clockIn, clockOut, breakTime) => {
   if (clockIn === '---' || clockOut === '---' || breakTime === '---') {

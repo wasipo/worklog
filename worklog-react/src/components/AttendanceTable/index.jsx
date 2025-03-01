@@ -1,7 +1,7 @@
 import './styles.css';
 import { formatDate, formatTime, getWeekday } from '../../utils/dateUtils';
 
-export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, validationErrors }) {
+export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, onDelete, validationErrors }) {
   if (!Array.isArray(logs) || logs.length === 0) {
     return null;
   }
@@ -38,19 +38,9 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, vali
     return log.clockIn === '---' && log.clockOut === '---';
   };
 
-  // 入力フィールドのツールチップ表示
-  const getInputTitle = (log, index) => {
-    if (validationErrors[index]) return validationErrors[index];
-    if (log.hasBreakMessage) return '休憩の記録があります';
-    return undefined;
-  };
-
-  // 入力フィールドのクラス名
-  const getInputClassName = (log, index) => {
-    const classes = ['break-time-input'];
-    if (log.hasBreakMessage) classes.push('highlight');
-    if (validationErrors[index]) classes.push('error');
-    return classes.join(' ');
+  // 削除ボタンの表示条件
+  const showDeleteButton = (log) => {
+    return !isHoliday(log) && log.clockIn !== '---' && log.clockOut !== '---';
   };
 
   return (
@@ -63,6 +53,7 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, vali
             <th>退勤時刻</th>
             <th>休憩時間</th>
             <th>稼働時間</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -77,12 +68,12 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, vali
               <td className="break-time-cell">
                 <input
                   type="text"
-                  className={getInputClassName(log, index)}
+                  className={`break-time-input ${log.hasBreakMessage ? 'highlight' : ''} ${validationErrors[index] ? 'error' : ''}`}
                   value={log.breakTime}
                   onChange={(e) => onBreakTimeChange(index, e.target.value)}
                   onBlur={() => onBreakTimeBlur(index)}
                   pattern="\d{1,2}:\d{2}"
-                  title={getInputTitle(log, index)}
+                  title={validationErrors[index] || (log.hasBreakMessage ? '休憩の記録があります' : undefined)}
                   placeholder="1:00"
                   disabled={isHoliday(log)}
                 />
@@ -93,11 +84,23 @@ export function AttendanceTable({ logs, onBreakTimeChange, onBreakTimeBlur, vali
                 )}
               </td>
               <td className="working-hours">{log.workingHours || '---'}</td>
+              <td>
+                {showDeleteButton(log) && (
+                  <button 
+                    onClick={() => onDelete(index)}
+                    className="delete-button"
+                    title="この日の勤怠データを削除"
+                  >
+                    削除
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
           <tr className="total-row">
             <td colSpan="4" style={{ textAlign: 'right' }}>合計稼働時間:</td>
             <td className="working-hours">{formatTotal(totalMinutes)}</td>
+            <td></td>
           </tr>
         </tbody>
       </table>
