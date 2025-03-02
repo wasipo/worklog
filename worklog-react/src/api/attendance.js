@@ -69,20 +69,21 @@ async function fetchThreadReplies(channelId, ts) {
   };
 }
 
-// 指定した月の全日付を生成する関数
+// 指定した月の全日付を生成する関数（UTC基準）
 function generateMonthDates(yearMonth) {
   const [year, month] = yearMonth.split('-').map(Number);
   const dates = [];
   
-  // 月の日数を取得
-  const daysInMonth = new Date(year, month, 0).getDate();
+  // 月の日数を正確にUTCで取得
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   
-  // 1日から月末まで配列を生成
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month - 1, day);
-    dates.push(date.toISOString().split('T')[0]);
+    // UTCの00:00:00として日付を生成
+    const utcDate = new Date(Date.UTC(year, month - 1, day));
+    dates.push(utcDate.toISOString().split('T')[0]);
   }
   
+  devLog('生成された日付一覧（UTC基準）:', dates);
   return dates;
 }
 
@@ -227,9 +228,12 @@ export async function fetchAttendanceLogs(yearMonth) {
     }
 
     // Step 5: 全日付のデータを作成し、ソート
-    const finalLogs = allDates.map(date => 
+    let finalLogs = allDates.map(date => 
       attendanceLogs[date] || createEmptyLog(date)
     );
+
+    // 指定した年月のログのみにフィルタリング
+    finalLogs = finalLogs.filter(log => log.date.startsWith(yearMonth));
 
     devLog('最終データ:', finalLogs);
     return finalLogs;
