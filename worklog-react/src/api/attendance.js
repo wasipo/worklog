@@ -1,21 +1,5 @@
-import { calculateWorkingHours, toJstISOString, devLog, devError } from '../utils/timeUtils';
+import { calculateWorkingHours, toJstISOString, getSlackSearchRange, devLog, devError } from '../utils/timeUtils';
 
-// 検索用の日付範囲をUTC基準で計算する関数
-function getSlackApiDateRange(yearMonth) {
-  const [year, month] = yearMonth.split('-').map(Number);
-  
-  // 対象月の前日をUTCで取得
-  const afterDate = new Date(Date.UTC(year, month - 1, 1));
-  afterDate.setUTCDate(afterDate.getUTCDate() - 1);
-  
-  // 翌月の1日を取得し、さらに1日延ばして翌月の2日に設定（1日延長）
-  const beforeDate = new Date(Date.UTC(year, month, 2));
-  
-  return {
-    afterDateStr: afterDate.toISOString().split('T')[0],
-    beforeDateStr: beforeDate.toISOString().split('T')[0],
-  };
-}
 // Slack API用のクライアント設定
 async function fetchSlackApi(endpoint, params) {
   const token = import.meta.env.VITE_SLACK_TOKEN;
@@ -62,12 +46,15 @@ async function fetchThreadReplies(channelId, ts) {
     throw new Error('スレッドのメッセージが見つかりません');
   }
 
-  // 最初と最後のメッセージを取得
-  const firstMessage = result.messages[0];
-  const lastMessage = result.messages[result.messages.length - 1];
+  // メッセージを時系列でソート（昇順）
+  const sortedMessages = result.messages.sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+  
+  // ソート後の最初と最後のメッセージを取得
+  const firstMessage = sortedMessages[0];
+  const lastMessage = sortedMessages[sortedMessages.length - 1];
 
   // スレッド内の全メッセージを対象に休憩メッセージをチェック
-  const hasBreakMessage = result.messages.some(msg => /休憩/.test(msg.text || ''));
+  const hasBreakMessage = sortedMessages.some(msg => /休憩/.test(msg.text || ''));
 
   // タイムスタンプをDateオブジェクトに変換し、JSTのISO文字列に変換
   const clockIn = toJstISOString(new Date(parseFloat(firstMessage.ts) * 1000));
@@ -178,12 +165,12 @@ export async function fetchAttendanceLogs(yearMonth) {
     const allDates = generateMonthDates(yearMonth);
     devLog('生成された日付一覧:', allDates);
 
-    // Step 2: 検索期間の設定（UTC基準で計算）
-    const { afterDateStr, beforeDateStr } = getSlackApiDateRange(yearMonth);
-    devLog('検索期間:', { afterDateStr, beforeDateStr });
+    // Step 2: 検索期間の設定（JST基準でUTCに変換）
+    const { afterDate, beforeDate } = getSlackSearchRange(yearMonth);
+    devLog('検索期間（UTC）:', { afterDate, beforeDate });
 
     // Step 3: メッセージの検索（チャンネル名を使用）
-    const searchQuery = `"${searchKeyword}" after:${afterDateStr} before:${beforeDateStr} in:#${channelName}`;
+    const searchQuery = `"${searchKeyword}" after:${afterDate} before:${beforeDate} in:#${channelName}`;
     devLog('Slack API検索条件:', searchQuery);
 
     const searchResult = await fetchSlackApi('search.messages', {
@@ -197,19 +184,40 @@ export async function fetchAttendanceLogs(yearMonth) {
     const attendanceLogs = {};
     const messages = searchResult.messages?.matches || [];
 
+    // 処理済みスレッドのTSを記録するSetを準備
+    const processedThreadTsSet = new Set();
+
     for (const message of messages) {
       try {
-        const threadData = await fetchThreadReplies(channelId, message.ts);
-        // メッセージのタイムスタンプからJSTの日付を取得
-        const messageDate = new Date(parseFloat(message.ts) * 1000);
-        const date = toJstISOString(messageDate).split('T')[0];
+        // スレッドのrootを特定（thread_tsがあればそれ、なければmessage.ts）
+        const rootTs = message.thread_ts || message.ts;
 
-        // 稼働時間を計算して追加
-        attendanceLogs[date] = {
-          date,
+        // すでに処理済みならスキップする
+        if (processedThreadTsSet.has(rootTs)) {
+          devLog(`スレッド重複検知、スキップ: ${rootTs}`);
+          continue;
+        }
+        processedThreadTsSet.add(rootTs);
+
+        // スレッドを取得する
+        const threadData = await fetchThreadReplies(channelId, rootTs);
+
+        // JSTの日付キー生成
+        const dateUTC = new Date(parseFloat(rootTs) * 1000);
+        const dateJSTString = toJstISOString(dateUTC);
+        const dateJST = dateJSTString.split('T')[0];
+
+        attendanceLogs[dateJST] = {
+          date: dateJST,
           ...threadData,
-          workingHours: calculateWorkingHours(threadData.clockIn, threadData.clockOut, threadData.breakTime)
+          workingHours: calculateWorkingHours(
+            threadData.clockIn,
+            threadData.clockOut,
+            threadData.breakTime
+          )
         };
+
+        devLog(`スレッド取得成功: ${dateJST}`, attendanceLogs[dateJST]);
       } catch (error) {
         devError(`スレッドの取得に失敗: ${error.message}`);
       }

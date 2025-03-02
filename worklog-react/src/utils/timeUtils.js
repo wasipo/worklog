@@ -2,26 +2,36 @@
 export const isValidBreakTime = (breakTime) => /^\d{1,2}:\d{2}$/.test(breakTime);
 
 // JSTとしてISO8601フォーマットする関数（9時間のオフセットを正確に処理）
-export const toJstISOString = (date) => {
-  const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return jstDate.toISOString().replace('Z', '+09:00');
+export const toJstISOString = (dateUTC) => {
+  const JST_OFFSET_MS = 9 * 60 * 60 * 1000; // UTC+9時間
+  const jstDate = new Date(dateUTC.getTime() + JST_OFFSET_MS);
+  return jstDate.toISOString().substring(0,19) + '+09:00';
 };
 
-// Slack APIの検索用に日付範囲を計算する関数
+// JSTの月初(1日0:00)〜月末(末日23:59)を漏れなく取得するSlack検索範囲を返す関数
 export const getSlackSearchRange = (yearMonth) => {
   const [year, month] = yearMonth.split('-').map(Number);
 
-  // JSTの月初日の前日をafterに指定（UTC日付に変換不要）
-  const afterDate = new Date(year, month - 1, 1);
-  afterDate.setDate(afterDate.getDate() - 1);
-  const afterDateStr = afterDate.toISOString().split('T')[0];
+  // 検索開始日は「前月末日」（JSTで当月1日0:00を確実に含む）
+  const afterDate = new Date(Date.UTC(year, month - 1, 1));
+  afterDate.setUTCDate(afterDate.getUTCDate() - 1);
 
-  // 翌月1日をbeforeに指定（UTC日付に変換不要）
-  const beforeDate = new Date(year, month, 1);
-  beforeDate.setDate(beforeDate.getDate() + 1);  // 1日延長
+  // 検索終了日は「翌月1日」（JSTで月末日23:59まで確実に含む）
+  const beforeDate = new Date(Date.UTC(year, month, 1));
+
+  const afterDateStr = afterDate.toISOString().split('T')[0];
   const beforeDateStr = beforeDate.toISOString().split('T')[0];
 
-  return { afterDate: afterDateStr, beforeDate: beforeDateStr };
+  devLog('日付範囲計算:', {
+    yearMonth,
+    afterDateStr,
+    beforeDateStr
+  });
+
+  return {
+    afterDate: afterDateStr,   // 前月最終日
+    beforeDate: beforeDateStr, // 翌月1日
+  };
 };
 
 // 稼働時間の計算
