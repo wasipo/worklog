@@ -18,6 +18,7 @@ export const getSlackSearchRange = (yearMonth) => {
 
   // 翌月1日をbeforeに指定（UTC日付に変換不要）
   const beforeDate = new Date(year, month, 1);
+  beforeDate.setDate(beforeDate.getDate() + 1);  // 1日延長
   const beforeDateStr = beforeDate.toISOString().split('T')[0];
 
   return { afterDate: afterDateStr, beforeDate: beforeDateStr };
@@ -32,18 +33,24 @@ export const calculateWorkingHours = (clockIn, clockOut, breakTime) => {
   try {
     const start = new Date(clockIn);
     const end = new Date(clockOut);
-    
-    // 休憩時間をパース
-    const [breakHours, breakMinutes] = breakTime.split(':').map(n => parseInt(n, 10));
-    const breakDuration = (breakHours * 60 + breakMinutes) * 60 * 1000;
-    
-    // 稼働時間を計算（ミリ秒）
-    const duration = end.getTime() - start.getTime() - breakDuration;
-    
+
+    // 秒以下を切り捨てる
+    start.setSeconds(0, 0);
+    end.setSeconds(0, 0);
+
+    // 休憩時間をミリ秒に変換
+    const [breakHours, breakMinutes] = breakTime.split(':').map(Number);
+    const breakDurationMs = (breakHours * 60 + breakMinutes) * 60 * 1000;
+
+    // 稼働時間（ミリ秒）
+    const durationMs = end - start - breakDurationMs;
+
+    if (durationMs <= 0) return '0:00';
+
     // 時間と分に変換
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-    
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
     return `${hours}:${String(minutes).padStart(2, '0')}`;
   } catch (error) {
     devError('稼働時間計算エラー:', error);
